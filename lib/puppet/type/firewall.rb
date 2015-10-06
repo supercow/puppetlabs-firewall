@@ -1915,3 +1915,37 @@ Puppet::Type.newtype(:firewall) do
     end
   end
 end
+
+# Create an extension to the existing "resources" resource
+#
+# A new parameter is added to allow specification of firewall chains
+# excluded from purging (similar to the unless_system_user parameter)
+
+require 'puppet/type/resources'
+
+class Puppet::Type::Resources
+  newparam(:exclude_chains) do
+    desc "A list of firewall rule chains that will not be purged by the resources resource."
+    munge do |value|
+      a = [value] unless value.is_a?(Array)
+      a.map! do |v|
+        v.to_s
+      end
+      a
+    end
+  end
+
+  def firewall_check(resource)
+    return true unless self[:name] == 'firewall'
+    return true unless self[:exclude_chains]
+
+    current_values = resource.retrieve_resource
+    current_chain = current_values[resource.property(:chain)]
+
+    self[:exclude_chains].each do |chain|
+      return false if current_chain == chain
+    end
+
+    return true
+  end
+end
